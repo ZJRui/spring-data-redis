@@ -29,6 +29,9 @@ import org.springframework.data.redis.serializer.RedisSerializer;
  * evalsha, then falling back to eval if Redis has not yet cached the script. Evalsha is not attempted if the script is
  * executed in a pipeline or transaction.
  *
+ * ScriptExecutor的默认实现。优化性能，首先尝试使用evalsha执行脚本，然后如果Redis还没有缓存脚本，
+ * 返回eval。如果脚本在管道或事务中执行，则不会尝试Evalsha。
+ *
  * @author Jennifer Hickey
  * @author Christoph Strobl
  * @author Thomas Darimont
@@ -62,6 +65,10 @@ public class DefaultScriptExecutor<K> implements ScriptExecutor<K> {
 			if (connection.isPipelined() || connection.isQueueing()) {
 				// We could script load first and then do evalsha to ensure sha is present,
 				// but this adds a sha1 to exec/closePipeline results. Instead, just eval
+				/**
+				 * //我们可以先执行脚本加载，然后执行evalsha以确保sha存在，
+				 * //但是这会增加一个sha1到exec/closePipeline结果。相反,只需要eval
+				 */
 				connection.eval(scriptBytes(script), returnType, keySize, keysAndArgs);
 				return null;
 			}

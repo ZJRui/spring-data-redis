@@ -97,6 +97,23 @@ public interface RedisServerCommands {
 	/**
 	 * Delete all keys of the currently selected database.
 	 *
+	 * 删除当前选定数据库的所有键。
+	 *
+	 * 自 1.0.0 起可用。
+	 *
+	 * 时间复杂度： O(N) 其中 N 是所选数据库中的键数
+	 *
+	 * 删除当前选定数据库的所有键。这个命令永远不会失败。
+	 *
+	 * 默认情况下，FLUSHDB将同步刷新数据库中的所有键。从 Redis 6.2 开始，将lazyfree-lazy-user-flush配置指令设置为“yes”会将默认刷新模式更改为异步。
+	 *
+	 * 可以使用以下修饰符之一来明确指定刷新模式：
+	 *
+	 * ASYNC: 异步刷新数据库
+	 * SYNC: 同步刷新数据库
+	 * 注意：异步FLUSHDB命令仅删除调用该命令时存在的键。在异步刷新期间创建的键将不受影响。
+	 *
+	 * *返回值
 	 * @see <a href="https://redis.io/commands/flushdb">Redis Documentation: FLUSHDB</a>
 	 */
 	void flushDb();

@@ -39,6 +39,7 @@ import org.springframework.util.Assert;
  * Interface that specified a basic set of Redis operations, implemented by {@link RedisTemplate}. Not often used but a
  * useful option for extensibility and testability (as it can be easily mocked or stubbed).
  *
+ * 接口指定了一组基本的Redis操作，由RedisTemplate实现。不经常使用，但对于可扩展性和可测试性来说是一个有用的选择(因为它很容易被嘲笑或存根)。
  * @author Costin Leau
  * @author Christoph Strobl
  * @author Ninad Divadkar
@@ -56,6 +57,9 @@ public interface RedisOperations<K, V> {
 	 * transaction manager. Generally, callback code must not touch any Connection lifecycle methods, like close, to let
 	 * the template do its work.
 	 *
+	 * 在Redis连接中执行给定的动作。只要可能，由操作对象抛出的应用程序异常就会传播给调用者(只能不检查)。Redis异常被转换成适当的DAO异常。
+	 * 允许返回一个结果对象，这是一个域对象或域对象的集合。对适合Redis存储的二进制数据的给定对象执行自动序列化/反序列化。
+	 * 注意:回调代码本身不应该处理事务!使用适当的事务管理器。通常，回调代码不能触及任何Connection生命周期方法，比如close，以便让模板完成它的工作。
 	 * @param <T> return type
 	 * @param action callback object that specifies the Redis action. Must not be {@literal null}.
 	 * @return a result object returned by the action or <tt>null</tt>
@@ -66,6 +70,8 @@ public interface RedisOperations<K, V> {
 	/**
 	 * Executes a Redis session. Allows multiple operations to be executed in the same session enabling 'transactional'
 	 * capabilities through {@link #multi()} and {@link #watch(Collection)} operations.
+	 *
+	 * 执行一个Redis会话。允许在同一个会话中执行多个操作，通过multi()和watch(Collection)操作启用“事务性”功能。
 	 *
 	 * @param <T> return type
 	 * @param session session callback. Must not be {@literal null}.
@@ -78,6 +84,7 @@ public interface RedisOperations<K, V> {
 	 * Executes the given action object on a pipelined connection, returning the results. Note that the callback
 	 * <b>cannot</b> return a non-null value as it gets overwritten by the pipeline. This method will use the default
 	 * serializers to deserialize results
+	 * 在管道连接上执行给定的操作对象，返回结果。注意，回调不能返回一个非空值，因为它被管道覆盖了。此方法将使用默认的序列化器对结果进行反序列化
 	 *
 	 * @param action callback object to execute
 	 * @return list of objects returned by the pipeline
@@ -87,6 +94,7 @@ public interface RedisOperations<K, V> {
 	/**
 	 * Executes the given action object on a pipelined connection, returning the results using a dedicated serializer.
 	 * Note that the callback <b>cannot</b> return a non-null value as it gets overwritten by the pipeline.
+	 * 在管道连接上执行给定的操作对象，使用专用的序列化器返回结果。注意，回调不能返回一个非空值，因为它被管道覆盖了。
 	 *
 	 * @param action callback object to execute
 	 * @param resultSerializer The Serializer to use for individual values or Collections of values. If any returned
@@ -101,6 +109,7 @@ public interface RedisOperations<K, V> {
 	 *
 	 * @param session Session callback
 	 * @return list of objects returned by the pipeline
+	 * 在管道连接上执行给定的Redis会话。允许事务被流水线处理。注意，回调不能返回一个非空值，因为它被管道覆盖了。
 	 */
 	List<Object> executePipelined(final SessionCallback<?> session);
 
@@ -108,6 +117,8 @@ public interface RedisOperations<K, V> {
 	 * Executes the given Redis session on a pipelined connection, returning the results using a dedicated serializer.
 	 * Allows transactions to be pipelined. Note that the callback <b>cannot</b> return a non-null value as it gets
 	 * overwritten by the pipeline.
+	 *
+	 * 在管道连接上执行给定的Redis会话，使用专用的序列化器返回结果。允许事务被流水线处理。注意，回调不能返回一个非空值，因为它被管道覆盖了。
 	 *
 	 * @param session Session callback
 	 * @param resultSerializer
@@ -146,6 +157,7 @@ public interface RedisOperations<K, V> {
 	/**
 	 * Allocates and binds a new {@link RedisConnection} to the actual return type of the method. It is up to the caller
 	 * to free resources after use.
+	 *分配并绑定一个新的RedisConnection到方法的实际返回类型。调用方有权在使用后释放资源。
 	 *
 	 * @param callback must not be {@literal null}.
 	 * @return
@@ -217,6 +229,24 @@ public interface RedisOperations<K, V> {
 	/**
 	 * Unlink the {@code key} from the keyspace. Unlike with {@link #delete(Object)} the actual memory reclaiming here
 	 * happens asynchronously.
+	 * 从键空间中解除键的链接。与delete(Object)不同，这里实际的内存回收是异步发生的。
+	 *
+	 * 自 4.0.0 起可用。
+	 *
+	 * 时间复杂度：对于删除的每个键，无论其大小如何，均为 O(1)。然后该命令在不同的线程中执行 O(N) 工作以回收内存，其中 N 是组成已删除对象的分配数。
+	 *
+	 * 此命令与DEL非常相似：它删除指定的键。就像DEL一样，如果键不存在，则会被忽略。然而，该命令在不同的线程中执行实际的内存回收，因此它不会阻塞，而DEL会阻塞。这就是命令名称的来源：该命令只是从键空间中取消键的链接。实际的删除将在稍后异步进行。
+	 *
+	 * 返回值
+	 * 整数回复：未链接的键数。
+	 *
+	 * 例子
+	 * Redis> SET key “你好”
+	 * “好的”
+	 * Redis> SET key2“世界”
+	 * “好的”
+	 * Redis> UNLINK key1 key2 key3
+	 * （整数）2
 	 *
 	 * @param key must not be {@literal null}.
 	 * @return The number of keys that were removed. {@literal null} when used in pipeline / transaction.
@@ -229,6 +259,8 @@ public interface RedisOperations<K, V> {
 	/**
 	 * Unlink the {@code keys} from the keyspace. Unlike with {@link #delete(Collection)} the actual memory reclaiming
 	 * here happens asynchronously.
+	 *
+	 * 从键空间中解除键的链接。与delete(Collection)不同，这里实际的内存回收是异步进行的。
 	 *
 	 * @param keys must not be {@literal null}.
 	 * @return The number of keys that were removed. {@literal null} when used in pipeline / transaction.
@@ -260,6 +292,15 @@ public interface RedisOperations<K, V> {
 
 	/**
 	 * Return a random key from the keyspace.
+	 *
+	 * 自 1.0.0 起可用。
+	 *
+	 * 时间复杂度： O(1)
+	 *
+	 * 从当前选择的数据库中返回一个随机密钥。
+	 *
+	 * 返回值
+	 * 批量字符串回复：随机密钥，或nil当数据库为空时。
 	 *
 	 * @return {@literal null} no keys exist or when used in pipeline / transaction.
 	 * @see <a href="https://redis.io/commands/randomkey">Redis Documentation: RANDOMKEY</a>
@@ -349,6 +390,32 @@ public interface RedisOperations<K, V> {
 	 * @param key must not be {@literal null}.
 	 * @return {@literal null} when used in pipeline / transaction.
 	 * @see <a href="https://redis.io/commands/persist">Redis Documentation: PERSIST</a>
+	 *
+	 *
+	 * ==
+	 *自 2.2.0 起可用。
+	 *
+	 * 时间复杂度： O(1)
+	 *
+	 * 删除 上的现有超时key，将密钥从volatile（设置了过期时间的密钥）变为持久性（一个永不过期的密钥，因为没有关联超时）。
+	 *
+	 * 返回值
+	 * 整数回复，特别是：
+	 *
+	 * 1 如果超时被删除。
+	 * 0如果key不存在或没有关联的超时。
+	 *
+	 * Examples
+	 * redis> SET mykey "Hello"
+	 * "OK"
+	 * redis> EXPIRE mykey 10
+	 * (integer) 1
+	 * redis> TTL mykey
+	 * (integer) 10
+	 * redis> PERSIST mykey
+	 * (integer) 1
+	 * redis> TTL mykey
+	 * (integ
 	 */
 	@Nullable
 	Boolean persist(K key);
@@ -366,6 +433,7 @@ public interface RedisOperations<K, V> {
 
 	/**
 	 * Retrieve serialized version of the value stored at {@code key}.
+	 * 检索存储在{@code key}的值的序列化版本。
 	 *
 	 * @param key must not be {@literal null}.
 	 * @return {@literal null} when used in pipeline / transaction.
@@ -376,12 +444,47 @@ public interface RedisOperations<K, V> {
 
 	/**
 	 * Create {@code key} using the {@code serializedValue}, previously obtained using {@link #dump(Object)}.
+	 * 使用先前使用dump(Object)获得的serializedValue创建键。
 	 *
 	 * @param key must not be {@literal null}.
 	 * @param value must not be {@literal null}.
 	 * @param timeToLive
 	 * @param unit must not be {@literal null}.
 	 * @see <a href="https://redis.io/commands/restore">Redis Documentation: RESTORE</a>
+	 *
+	 * ==========
+	 *自 2.6.0 起可用。
+	 *
+	 * 时间复杂度： O(1) 来创建新键和额外的 O(N*M) 来重建序列化值，其中 N 是组成值的 Redis 对象的数量，M 是它们的平均大小。对于小字符串值，时间复杂度为 O(1)+O(1*M)，其中 M 很小，所以简单为 O(1)。然而，对于排序集合值，复杂度是 O(N*M*log(N))，因为将值插入到排序集合中是 O(log(N))。
+	 *
+	 * 创建与通过反序列化提供的序列化值（通过DUMP获得）获得的值关联的键。
+	 *
+	 * 如果ttl为 0，则创建的密钥没有任何过期，否则设置指定的过期时间（以毫秒为单位）。
+	 *
+	 * 如果使用了ABSTTL修饰符，ttl则应表示密钥将过期的绝对 Unix 时间戳（以毫秒为单位）。（Redis 5.0 或更高版本）。
+	 *
+	 * 出于驱逐目的，您可以使用IDLETIME或FREQ修饰符。有关更多信息，请参阅 OBJECT（Redis 5.0 或更高版本）。
+	 *
+	 * key除非您使用REPLACE修饰符（Redis 3.0 或更高版本），否则RESTORE将在已存在时返回“目标键名称正忙”错误。
+	 *
+	 * RESTORE检查 RDB 版本和数据校验和。如果它们不匹配，则返回错误。
+	 *
+	 *
+	 * Examples
+	 * redis> DEL mykey
+	 * 0
+	 * redis> RESTORE mykey 0 "\n\x17\x17\x00\x00\x00\x12\x00\x00\x00\x03\x00\
+	 *                         x00\xc0\x01\x00\x04\xc0\x02\x00\x04\xc0\x03\x00\
+	 *                         xff\x04\x00u#<\xc0;.\xe9\xdd"
+	 * OK
+	 * redis> TYPE mykey
+	 * list
+	 * redis> LRANGE mykey 0 -1
+	 * 1) "1"
+	 * 2) "2"
+	 * 3) "3"
+	 *
+	 *
 	 */
 	default void restore(K key, byte[] value, long timeToLive, TimeUnit unit) {
 		restore(key, value, timeToLive, unit, false);
@@ -503,6 +606,7 @@ public interface RedisOperations<K, V> {
 	 * Mark the start of a transaction block. <br>
 	 * Commands will be queued and can then be executed by calling {@link #exec()} or rolled back using {@link #discard()}
 	 * <p>
+	 *     标记事务块的开始。命令将被排队，然后可以通过调用exec()或使用discard()回滚来执行命令
 	 *
 	 * @see <a href="https://redis.io/commands/multi">Redis Documentation: MULTI</a>
 	 */
@@ -518,6 +622,7 @@ public interface RedisOperations<K, V> {
 	/**
 	 * Executes all queued commands in a transaction started with {@link #multi()}. <br>
 	 * If used along with {@link #watch(Object)} the operation will fail if any of watched keys has been modified.
+	 *执行以multi()开始的事务中所有排队的命令。如果与watch(Object)一起使用，则如果任何被监视的键被修改，操作将失败。
 	 *
 	 * @return List of replies for each executed command.
 	 * @see <a href="https://redis.io/commands/exec">Redis Documentation: EXEC</a>
@@ -529,6 +634,10 @@ public interface RedisOperations<K, V> {
 	 * Collections of byte[]s. If a result is a Map, the provided {@link RedisSerializer} will be used for both the keys
 	 * and values. Other result types (Long, Boolean, etc) are left as-is in the converted results. Tuple results are
 	 * automatically converted to TypedTuples.
+	 *
+	 * 执行一个事务，使用提供的RedisSerializer来反序列化任何字节[]s或字节[]s的集合的结果。如果结果是Map，
+	 * 则提供的RedisSerializer将同时用于键和值。其他结果类型(Long、Boolean等)在转换后的结果中保持原样。
+	 * 元组结果会自动转换为typedtuple。
 	 *
 	 * @param valueSerializer The {@link RedisSerializer} to use for deserializing the results of transaction exec
 	 * @return The deserialized results of transaction exec
@@ -664,6 +773,7 @@ public interface RedisOperations<K, V> {
 
 	/**
 	 * Returns the operations performed on set values bound to the given key.
+	 * 返回对绑定到给定键的集合值所执行的操作。
 	 *
 	 * @param key Redis key
 	 * @return set operations bound to the given key
@@ -697,14 +807,15 @@ public interface RedisOperations<K, V> {
 
 	/**
 	 * Returns the operations performed on simple values (or Strings in Redis terminology).
-	 *
+	 *返回对简单值(Redis术语为string)所执行的操作。
 	 * @return value operations
 	 */
 	ValueOperations<K, V> opsForValue();
 
 	/**
 	 * Returns the operations performed on simple values (or Strings in Redis terminology) bound to the given key.
-	 *
+	 * 返回对绑定到给定键的简单值(Redis术语为string)所执行的操作。
+	 * 返回对对给定密钥的简单值（或redis术语中的字符串）执行的操作
 	 * @param key Redis key
 	 * @return value operations bound to the given key
 	 */

@@ -29,6 +29,9 @@ import org.springframework.util.Assert;
  * <p>
  * Does not perform any {@literal null} conversion since empty strings are valid keys/values.
  *
+ * 简单的字符串到字节[](和后退)序列化器。使用指定的字符集(默认为UTF-8)将字符串转换为字节，反之亦然。
+ * 当与Redis的交互主要通过字符串发生时很有用。
+ * 不执行任何空转换，因为空字符串是有效的键/值。
  * @author Costin Leau
  * @author Christoph Strobl
  * @author Mark Paluch
@@ -92,6 +95,12 @@ public class StringRedisSerializer implements RedisSerializer<String> {
 	/*
 	 * (non-Javadoc)
 	 * @see org.springframework.data.redis.serializer.RedisSerializer#serialize(java.lang.Object)
+	 *
+	 * 从这个方法中我们看到我们只能够对string类型的数据做序列化，而非Object
+	 *
+	 * object.toString.getBytes()也不行，必须是key为string进行序列化，或者value为string进行序列化
+	 *
+	 *
 	 */
 	@Override
 	public byte[] serialize(@Nullable String string) {

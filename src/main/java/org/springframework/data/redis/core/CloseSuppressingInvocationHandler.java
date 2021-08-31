@@ -53,6 +53,22 @@ class CloseSuppressingInvocationHandler implements InvocationHandler {
 			return System.identityHashCode(proxy);
 		} else if (method.getName().equals(CLOSE)) {
 			// Handle close method: suppress, not valid.
+
+			/**
+			 * 如果exposeConnection为true则表示对外暴露connection，此时 connToExpose=conntoUse
+			 *
+			 * 否则将会执行createRedisConnectionProxy 为connTouse 创建代理对象，在创建代理对象的是时候我们制定的代理接口是 RedisConnection
+			 * 使用CloseSuppressingInvocationHandler 作为InvocationHandler
+			 *
+			 * 柑橘这个CloseSuppressingInvocationHandler中并没有什么重要的实现，只是在判断 当前调用的方法是不是 RedisConnection的close方法，如果是
+			 * 则不会执行任何操作
+			 * if (method.getName().equals(CLOSE)) {
+			 * 			// Handle close method: suppress, not valid.
+			 * 			return null;
+			 * }
+			 *
+			 */
+
 			return null;
 		}
 

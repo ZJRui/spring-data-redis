@@ -25,6 +25,8 @@ import org.springframework.util.Assert;
 /**
  * Base class for {@link RedisTemplate} defining common properties. Not intended to be used directly.
  *
+ * 定义公共属性的RedisTemplate基类。不打算直接使用。
+ *
  * @author Costin Leau
  */
 public class RedisAccessor implements InitializingBean {

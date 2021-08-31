@@ -23,7 +23,7 @@ import org.springframework.lang.Nullable;
  * Callback interface for Redis 'low level' code. To be used with {@link RedisTemplate} execution methods, often as
  * anonymous classes within a method implementation. Usually, used for chaining several operations together (
  * {@code get/set/trim etc...}.
- *
+ *回调接口的Redis '低级'代码。与RedisTemplate执行方法一起使用，通常作为方法实现中的匿名类。通常，用于将多个操作链接在一起(get/set/trim等....)
  * @author Costin Leau
  */
 public interface RedisCallback<T> {
@@ -31,6 +31,9 @@ public interface RedisCallback<T> {
 	/**
 	 * Gets called by {@link RedisTemplate} with an active Redis connection. Does not need to care about activating or
 	 * closing the connection or handling exceptions.
+	 * 通过活跃的Redis连接被RedisTemplate调用。不需要关心激活或关闭连接或处理异常。
+	 *
+	 * 问题：这个方法什么时候被调用？在哪里调用
 	 *
 	 * @param connection active Redis connection
 	 * @return a result object or {@code null} if none

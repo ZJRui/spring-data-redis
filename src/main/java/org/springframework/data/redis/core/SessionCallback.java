@@ -22,12 +22,14 @@ import org.springframework.lang.Nullable;
  * Callback executing all operations against a surrogate 'session' (basically against the same underlying Redis
  * connection). Allows 'transactions' to take place through the use of multi/discard/exec/watch/unwatch commands.
  *
+ * 回调对代理'session'执行所有操作(基本上是针对相同的底层Redis连接)。允许通过使用多个/discard/exec/watch/unwatch命令来发生“事务”。
  * @author Costin Leau
  */
 public interface SessionCallback<T> {
 
 	/**
 	 * Executes all the given operations inside the same session.
+	 * 在同一个会话中执行所有给定的操作。
 	 *
 	 * @param operations Redis operations
 	 * @return return value

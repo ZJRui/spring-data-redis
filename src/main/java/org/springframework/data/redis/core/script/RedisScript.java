@@ -22,6 +22,7 @@ import org.springframework.util.Assert;
 /**
  * A script to be executed using the <a href="https://redis.io/commands/eval">Redis scripting support</a> available as
  * of version 2.6
+ * 使用版本2.6提供的Redis脚本支持来执行的脚本
  *
  * @author Jennifer Hickey
  * @author Christoph Strobl

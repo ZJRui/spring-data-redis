@@ -27,7 +27,7 @@ import org.springframework.util.Assert;
 
 /**
  * Redis operations for simple (or in Redis terminology 'string') values.
- *
+ *Redis操作简单(或在Redis的术语'字符串')值。
  * @author Costin Leau
  * @author Christoph Strobl
  * @author Mark Paluch

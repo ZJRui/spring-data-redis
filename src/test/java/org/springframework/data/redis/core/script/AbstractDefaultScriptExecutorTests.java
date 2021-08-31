@@ -149,6 +149,9 @@ public abstract class AbstractDefaultScriptExecutorTests {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Test
 	void testExecuteStatusResult() {
+		/**
+		 *
+		 */
 		this.template = new RedisTemplate<String, Long>();
 		template.setKeySerializer(StringRedisSerializer.UTF_8);
 		template.setValueSerializer(new GenericToStringSerializer<>(Long.class));

@@ -87,6 +87,103 @@ import org.springframework.util.CollectionUtils;
  * @param <K> the Redis key type against which the template works (usually a String)
  * @param <V> the Redis value type against which the template works
  * @see StringRedisTemplate
+ *
+ *
+ *
+ * 简化Redis数据访问代码的Helper类。
+ *
+ * 在给定对象和Redis存储的底层二进制数据之间执行自动序列化/反序列化。
+ * 默认情况下，它对其对象使用Java序列化(通过JdkSerializationRedisSerializer)。对于字符串密集型操作，请考虑专用的StringRedisTemplate。
+ *
+ * 中央方法被执行，支持Redis访问代码实现RedisCallback接口。
+ * 它提供了RedisConnection处理这样的RedisCallback实现或调用代码都不需要显式地关心检索/关闭Redis连接，
+ * 或处理连接生命周期异常。对于典型的单步骤操作，有各种方便的方法。
+ * 一旦配置好，这个类就是线程安全的。
+ *
+ * 请注意，虽然模板是泛化的，但要由序列化器/反序列化器来正确地将给定对象与二进制数据进行转换。
+ *===============================================
+ *
+ *
+ *
+ * RedisTemplate 是什么，他是一个针对key value操作的RedisOperations。 RedisOperations 接口中定义了Redis的操作。
+ *
+ * RedisOperations中定义了一些redis的基本操作，我们知道不同的数据结构redis的操作方法不同，还定义了几个方法
+ * 	ListOperations<K, V> opsForList();
+ * 	BoundListOperations<K, V> boundListOps(K key);
+ * 	SetOperations<K, V> opsForSet();
+ * 	BoundSetOperations<K, V> boundSetOps(K key);
+ * 	ValueOperations<K, V> opsForValue();
+ * 	BoundValueOperations<K, V> boundValueOps(K key);
+ *
+ * 	返回值是针对该类型的数据结构的操作接口，这个接口中定义了针对该类型数据的redis操作。
+ *
+ * 	那么redisTemplate是如何设计的呢？
+ * 	首先定义一个顶级接口BoundKeyOperations<K>  ，表示针对key的操作接口，然后因为value有多种类型，所以有如下几个子接口
+ * 	BoundValueOperations<K, V>、BoundSetOperations<K, V>、BoundListOperations<K, V>，子接口中扩展了对特定数据类型的操作
+ * 	比如BoundSetOperation可以 添加多个value到key中： Long add(V... values); 也可以 	V pop();
+ *
+ *   同时BoundKeyOperations接口有一个抽象实现子类abstract class DefaultBoundKeyOperations<K> implements BoundKeyOperations<K>
+ *    这个DefaultBoundKeyOperations 中提供了对key的操作，比如 get expire  persist  remove
+ *
+ *
+ * 	对于每一个特定类型的数据结构的操作接口，比如BoundSetOperation 都有一个默认实现类DefaultBoundSetOperations<k,v>.
+ *
+ *   这个class DefaultBoundSetOperations<K, V> extends DefaultBoundKeyOperations<K> implements BoundSetOperations<K, V>
+ *   他一方面继承自 DefaultBoundKeyOperations 从而拥有了对key的基本操作，另一方面又实现了 BoundSetOperations 从而拥有了
+ *   对Set数据类型的操作方法。
+ *
+ *   那么我们关心 DefaultBoundSetOperations 到底是如何实现操作Set数据结构的呢？
+ *
+ *   在项目中实际上 单独定义了对set操作的接口 SetOperations<K, V> ，在DefaultBoundSetOperations中就存在 SetOperation属性
+ *
+ *   在创建DefaultBoundSetOperations 对象的时候我们会 传递一个key，和一个RedisTemplate对象。对于DefaultBoundSetOperations对象的内部属性
+ *   我们会通过RedisTemplate的opsForSet方法来获取，并且是在DefaultBoundSetOperations的构造器中赋值。
+ *   SetOperation ops = redisTemplate.opsForSet();
+ *
+ *   那么RedisTemplate的opsForSet又是如何实现的呢？返回了成员属性 SetOperations<K, V> setOps = new DefaultSetOperations<>(this);
+ *
+ *   @Override
+ *    public SetOperations<K, V> opsForSet() {
+ * 		return setOps;
+ *    }
+ *
+ *    那么也就是说创建两个DefaultBoundSetOperations  使用不同的key，但是使用相同的RedisTemplate传递给DefaultBoundSetOperations 对象，
+ *    然后这个时候这两个DefaultBoundSetOperations 对象内部的SetOperation对象都是通过 SetOperation ops = redisTemplate.opsForSet();得到的
+ *    因此这两个SetOperation对象是相同的。
+ *
+ *
+ *    而且需要注意的是  RedisTemplate的成员属性setOps = new DefaultSetOperations<>(this); 构建的时候传入了this ，this就是RedisTemplate，
+ *    因此DefaultSetOperations 中就可以拿到RedisTemplate， DefaultSetOperation实现类中包含了对set数据结构的操作方法，实际上这些操作方法都是委托给
+ *    RedisTemplate的方法来实现的，比如DefaultSetOperation的add方法委托给其内部的execute，内部的execute又是执行了RedisTemplate的execute
+ *    @Override
+ *        public Long add(K key, V... values) {
+ *
+ * 		byte[] rawKey = rawKey(key);
+ * 		byte[][] rawValues = rawValues((Object[]) values);
+ * 		return execute(connection -> connection.sAdd(rawKey, rawValues), true);
+ *    }
+ *
+ *    @Nullable
+ * 	<T> T execute(RedisCallback<T> callback, boolean exposeConnection) {
+ * 		return template.execute(callback, exposeConnection);
+ *     }
+ *
+ * 另外在上面我们提到了 项目中针对各种数据结构的操作单独提供了顶级接口，比如 SetOperations<K, V> , ValueOperations<K, V> 然后针对每一种接口都提供了默认的实现
+ * 比如DefaultSetOperation，DefaultSetOperations不单单实现了SetOperation接口，还继承自AbstractOperations
+ *
+ * DefaultSetOperations<K, V> extends AbstractOperations<K, V> implements SetOperations<K, V>
+ *
+ *
+ *     AbstractOperations中定义了对key value的序列化，同时对外提供了统一的 使用RedisTemplate的方式。
+ *@Nullable
+ * 	<T> T execute(RedisCallback<T> callback, boolean exposeConnection) {
+ * 		return template.execute(callback, exposeConnection);
+ *        }
+ *
+ *
+ *
+ *
+ *
  */
 public class RedisTemplate<K, V> extends RedisAccessor implements RedisOperations<K, V>, BeanClassLoaderAware {
 
@@ -195,6 +292,7 @@ public class RedisTemplate<K, V> extends RedisAccessor implements RedisOperation
 	 * Executes the given action object within a connection that can be exposed or not. Additionally, the connection can
 	 * be pipelined. Note the results of the pipeline are discarded (making it suitable for write-only scenarios).
 	 *
+	 * 在可公开或不公开的连接中执行给定的操作对象。此外，可以将连接流水线化。注意，管道的结果被丢弃了(这使得它适合只写场景)。
 	 * @param <T> return type
 	 * @param action callback object to execute
 	 * @param exposeConnection whether to enforce exposure of the native Redis Connection to callback code
@@ -208,6 +306,14 @@ public class RedisTemplate<K, V> extends RedisAccessor implements RedisOperation
 		Assert.notNull(action, "Callback object must not be null");
 
 		RedisConnectionFactory factory = getRequiredConnectionFactory();
+		/**
+		 * enableTransactionSupport :如果设置为true, RedisTemplate将使用MULTI…EXEC|DISCARD用于跟踪操作。比如
+		 * StringRedisTemplate template = new StringRedisTemplate(redisConnectionFactory());
+		 *
+		 * // explicitly enable transaction support
+		 * template.setEnableTransactionSupport(true);
+		 *
+		 */
 		RedisConnection conn = RedisConnectionUtils.getConnection(factory, enableTransactionSupport);
 
 		try {
@@ -220,7 +326,39 @@ public class RedisTemplate<K, V> extends RedisAccessor implements RedisOperation
 				connToUse.openPipeline();
 			}
 
+
+			/**
+			 * 如果exposeConnection为true则表示对外暴露connection，此时 connToExpose=conntoUse
+			 *
+			 * 否则将会执行createRedisConnectionProxy 为connTouse 创建代理对象，在创建代理对象的是时候我们制定的代理接口是 RedisConnection
+			 * 使用CloseSuppressingInvocationHandler 作为InvocationHandler
+			 *
+			 * 柑橘这个CloseSuppressingInvocationHandler中并没有什么重要的实现，只是在判断 当前调用的方法是不是 RedisConnection的close方法，如果是
+			 * 则不会执行任何操作
+			 * if (method.getName().equals(CLOSE)) {
+			 * 			// Handle close method: suppress, not valid.
+			 * 			return null;
+			 * }
+			 *
+			 */
 			RedisConnection connToExpose = (exposeConnection ? connToUse : createRedisConnectionProxy(connToUse));
+			/**
+			 * 在这里调换用RedisCallback的doInRedis方法传入了RedisConnection,从这里我们可以看到上面的内容只是 封装了connection的获取方式
+			 *
+			 *  比如对delete操作而言
+			 *
+			 *@Override
+			 *public Boolean delete (K key){
+			 *
+			 *byte[] rawKey = rawKey(key);
+			 *
+			 *Long result = execute(connection -> connection.del(rawKey), true);
+			 *return result != null && result.intValue() == 1;
+			 *}
+			 * 我们不关心如何获取connection，因此创建后一个RedisCallback，然后直接使用connection的del操作。
+			 * 也就是说RedisTemplate中的所有操作都是以RedisCallback的形式委托给Connection操作的
+			 *
+			 */
 			T result = action.doInRedis(connToExpose);
 
 			// close pipeline
@@ -1364,6 +1502,8 @@ public class RedisTemplate<K, V> extends RedisAccessor implements RedisOperation
 	/**
 	 * If set to {@code true} {@link RedisTemplate} will participate in ongoing transactions using
 	 * {@literal MULTI...EXEC|DISCARD} to keep track of operations.
+	 *
+	 * 如果设置为true, RedisTemplate将使用MULTI…EXEC|DISCARD用于跟踪操作。
 	 *
 	 * @param enableTransactionSupport whether to participate in ongoing transactions.
 	 * @since 1.3

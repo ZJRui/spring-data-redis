@@ -22,6 +22,7 @@ import org.springframework.data.redis.core.RedisOperations;
  * Basic interface for Redis-based collections. Offers access to the {@link RedisOperations} entity used for executing
  * commands against the backing store.
  *
+ * 基于redis的集合的基本接口。提供对用于对后备存储执行命令的RedisOperations实体的访问。
  * @author Costin Leau
  */
 public interface RedisStore extends BoundKeyOperations<String> {

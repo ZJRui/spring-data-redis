@@ -31,6 +31,46 @@ public interface RedisScriptingCommands {
 
 	/**
 	 * Flush lua script cache.
+	 * 刷新lua脚本缓存。
+	 *
+	 * Available since 2.6.0.
+	 *
+	 * Time complexity: O(N) with N being the number of scripts in cache
+	 *
+	 * Flush the Lua scripts cache.
+	 *
+	 * Please refer to the EVAL documentation for detailed information about Redis Lua scripting.
+	 *
+	 * By default, SCRIPT FLUSH will synchronously flush the cache. Starting with Redis 6.2, setting the lazyfree-lazy-user-flush configuration directive to "yes" changes the default flush mode to asynchronous.
+	 *
+	 * It is possible to use one of the following modifiers to dictate the flushing mode explicitly:
+	 *
+	 * ASYNC: flushes the cache asynchronously
+	 * SYNC: flushes the cache synchronously
+	 * Return value
+	 * Simple string reply
+	 *
+	 * History
+	 * >= 6.2.0: Added the ASYNC and SYNC flushing mode modifiers, as well as the lazyfree-lazy-user-flush configuration directive.
+	 *
+	 *
+	 *
+	 *
+	 * 刷新 Lua 脚本缓存。
+	 *
+	 * 有关 Redis Lua 脚本的详细信息，请参阅EVAL文档。
+	 *
+	 * 默认情况下，SCRIPT FLUSH将同步刷新缓存。从 Redis 6.2 开始，将lazyfree-lazy-user-flush配置指令设置为“yes”会将默认刷新模式更改为异步。
+	 *
+	 * 可以使用以下修饰符之一来明确指定刷新模式：
+	 *
+	 * ASYNC: 异步刷新缓存
+	 * SYNC: 同步刷新缓存
+	 * 返回值
+	 * 简单的字符串回复
+	 *
+	 * 历史
+	 * >= 6.2.0：添加了ASYNC和SYNC刷新模式修饰符，以及 lazyfree-lazy-user-flush配置指令。
 	 *
 	 * @see <a href="https://redis.io/commands/script-flush">Redis Documentation: SCRIPT FLUSH</a>
 	 */
@@ -47,6 +87,7 @@ public interface RedisScriptingCommands {
 	 * Load lua script into scripts cache, without executing it.<br>
 	 * Execute the script by calling {@link #evalSha(byte[], ReturnType, int, byte[]...)}.
 	 *
+	 * 加载lua脚本到脚本缓存中，而不执行它。通过调用evalSha(byte[]， ReturnType, int, byte[]…)来执行脚本。
 	 * @param script must not be {@literal null}.
 	 * @return {@literal null} when used in pipeline / transaction.
 	 * @see <a href="https://redis.io/commands/script-load">Redis Documentation: SCRIPT LOAD</a>

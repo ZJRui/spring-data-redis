@@ -40,6 +40,8 @@ import org.springframework.util.CollectionUtils;
 /**
  * Internal base class used by various RedisTemplate XXXOperations implementations.
  *
+ * 各种RedisTemplate XXXOperations使用的内部基类
+ *
  * @author Costin Leau
  * @author Jennifer Hickey
  * @author Christoph Strobl

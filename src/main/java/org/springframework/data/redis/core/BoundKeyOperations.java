@@ -31,6 +31,10 @@ import org.springframework.util.Assert;
  * {@literal null}.
  * <p>
  *
+ * 操作一个Redis键。用于执行所有实现的通用键绑定操作。
+ * 和其他api一样，如果底层连接是管道连接或队列连接/在多模式下，所有方法将返回null。
+ *
+ * 对key的操作
  * @author Costin Leau
  * @author Christoph Strobl
  * @author Mark Paluch

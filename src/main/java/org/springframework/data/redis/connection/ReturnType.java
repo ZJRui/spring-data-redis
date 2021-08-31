@@ -24,6 +24,7 @@ import org.springframework.util.ClassUtils;
  * Represents a data type returned from Redis, currently used to denote the expected return type of Redis scripting
  * commands
  *
+ * 表示从Redis返回的数据类型，当前用于表示Redis脚本命令的预期返回类型
  * @author Jennifer Hickey
  * @author Christoph Strobl
  * @author Mark Paluch
@@ -77,6 +78,9 @@ public enum ReturnType {
 			return ReturnType.INTEGER;
 		}
 
+		/**
+		 * Returned as byte[]
+		 */
 		return ReturnType.VALUE;
 	}
 }

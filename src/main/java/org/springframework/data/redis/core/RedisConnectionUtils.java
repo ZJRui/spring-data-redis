@@ -117,16 +117,41 @@ public abstract class RedisConnectionUtils {
 	 * @param bind binds the connection to the thread, in case one was created-
 	 * @param transactionSupport whether transaction support is enabled.
 	 * @return an active Redis connection.
+	 *
+	 * 从给定的RedisConnectionFactory实际获取一个RedisConnection。知道绑定到当前事务(使用事务管理器时)或当前线程(将连接绑定到闭包作用域时)的现有连接。如果allowCreate为true，将创建一个新的RedisConnection。该方法允许以RedisConnectionUtils的形式重新进入。RedisConnectionHolder跟踪refcount。
+	 *
+	 * 参数:
+	 * 工厂-创建连接的连接工厂。
+	 * allowCreate—当找不到当前线程的连接时，是否应该创建一个新的(未绑定的)连接。
+	 * 绑定到线程的连接，以防线程被创建
+	 * transactionSupport—是否启用事务支持。
+	 *
 	 */
 	public static RedisConnection doGetConnection(RedisConnectionFactory factory, boolean allowCreate, boolean bind,
 			boolean transactionSupport) {
 
 		Assert.notNull(factory, "No RedisConnectionFactory specified");
 
+		/**
+		 * 从ThreadLocal中获取resource
+		 * https://blog.csdn.net/cor_twi/article/details/53819513
+		 *
+		 * 这里的factory就类似于DataSource
+		 *
+		 */
 		RedisConnectionHolder conHolder = (RedisConnectionHolder) TransactionSynchronizationManager.getResource(factory);
 
+		/**
+		 * 线程中存在ConnectionHolder，则直接从holder中取出，同时 调用conHolder.requested();方法将connection的引用数量加1，后面
+		 * 当调换用release操作的时候会将引用数量-1，然后release之后判断引用数量是否为0，如果为0表示可以关闭connection
+		 */
 		if (conHolder != null && (conHolder.hasConnection() || conHolder.isSynchronizedWithTransaction())) {
+			/**请求使用数量++
+			 */
 			conHolder.requested();
+			/**
+			 * 如果没有connection则获取
+			 */
 			if (!conHolder.hasConnection()) {
 				log.debug("Fetching resumed Redis Connection from RedisConnectionFactory");
 				conHolder.setConnection(fetchConnection(factory));
@@ -134,19 +159,41 @@ public abstract class RedisConnectionUtils {
 			return conHolder.getRequiredConnection();
 		}
 
-		// Else we either got no holder or an empty thread-bound holder here.
+		// Else we either got no holder or an empty thread-bound holder here.否则我们在这里没有持有人或空线程绑定持有者。
 
 		if (!allowCreate) {
 			throw new IllegalArgumentException("No connection found and allowCreate = false");
 		}
 
 		log.debug("Fetching Redis Connection from RedisConnectionFactory");
+		/**
+		 *  factory.getConnection();
+		 *  Jedis jedis = fetchJedisConnector();
+		 * JedisClientConfig sentinelConfig = this.clientConfig;
+		 * new JedisConnection(jedis, null, this.clientConfig, sentinelConfig));
+		 * 得到JedisConnection
+		 */
 		RedisConnection connection = fetchConnection(factory);
 
+		/**
+		 * 如果开启了事务，并且事务支持，则将其存放threadLocal
+		 *其中可以通过  org.springframework.transaction.support.TransactionSynchronizationManager#setActualTransactionActive(boolean)  设置开启事务支持
+		 *
+		 * 在spring中，开启事务的时候会设置这个标记为true
+		 * org.springframework.transaction.support.TransactionSynchronizationManager#setActualTransactionActive
+		 *  AbstractPlatformTransactionManager.prepareSynchronization(DefaultTransactionStatus, TransactionDefinition)  (org.springframework.transaction.support)
+		 *     AbstractPlatformTransactionManager.prepareTransactionStatus(TransactionDefinition, Object, boolean, boolean, boolean, Object)  (org.springframework.transaction.support)
+		 *         AbstractPlatformTransactionManager.getTransaction(TransactionDefinition)  (org.springframework.transaction.support)
+		 *
+		 */
 		boolean bindSynchronization = TransactionSynchronizationManager.isActualTransactionActive() && transactionSupport;
 
 		if (bind || bindSynchronization) {
 
+			/**
+			 * 如果事务被设置为只允许读，则创建connection对象的代理对象 使用ConnectionSplittingInterceptor 作为MethodInterceptor
+			 * 执行 的时候判断当前connection执行的方法是否是只读的方法
+			 */
 			if (bindSynchronization && isActualNonReadonlyTransactionActive()) {
 				connection = createConnectionSplittingProxy(connection, factory);
 			}
@@ -220,6 +267,17 @@ public abstract class RedisConnectionUtils {
 				&& !TransactionSynchronizationManager.isCurrentTransactionReadOnly();
 	}
 
+	/**
+	 *
+	 第一种方式使用InvocationHandler  为RedisConnection创建代理对象，使用CloseSuppressingInvocationHandler作为InvocationHandler。
+	 org.springframework.data.redis.core. RedisTemplate#createRedisConnectionProxy
+	 第二种方式使用MethodInterceptor创建代理对象
+	 *
+	 *
+	 * @param connection
+	 * @param factory
+	 * @return
+	 */
 	private static RedisConnection createConnectionSplittingProxy(RedisConnection connection,
 			RedisConnectionFactory factory) {
 
@@ -456,6 +514,7 @@ public abstract class RedisConnectionUtils {
 	/**
 	 * {@link MethodInterceptor} that invokes read-only commands on a new {@link RedisConnection} while read-write
 	 * commands are queued on the bound connection.
+	 * MethodInterceptor，当读写命令在绑定的连接上排队时，对新的RedisConnection调用只读命令。
 	 *
 	 * @author Christoph Strobl
 	 * @author Mark Paluch
@@ -484,6 +543,9 @@ public abstract class RedisConnectionUtils {
 
 			RedisCommand commandToExecute = RedisCommand.failsafeCommandLookup(method.getName());
 
+			/**
+			 * 如果是不是只读命令则 在目标obj上执行
+			 */
 			if (isPotentiallyThreadBoundCommand(commandToExecute)) {
 
 				if (log.isDebugEnabled()) {
@@ -497,6 +559,9 @@ public abstract class RedisConnectionUtils {
 				log.debug(String.format("Invoke '%s' on unbound connection", method.getName()));
 			}
 
+			/**
+			 * 如果是只读命令我们可以创建一个新的connection执行，从而避免阻塞
+			 */
 			RedisConnection connection = factory.getConnection();
 
 			try {
@@ -519,6 +584,12 @@ public abstract class RedisConnectionUtils {
 		}
 
 
+		/**
+		 * isreadOnly为false，则返回true，
+		 * isReadONly为true  则返回false
+		 * @param command
+		 * @return
+		 */
 		private boolean isPotentiallyThreadBoundCommand(RedisCommand command) {
 			return RedisCommand.UNKNOWN.equals(command) || !command.isReadonly();
 		}
@@ -606,7 +677,13 @@ public abstract class RedisConnectionUtils {
 		 */
 		@Override
 		public void released() {
+			/**
+			 * 使用referenceCount 减减
+			 */
 			super.released();
+			/**
+			 * isOpen的原理是判断 引用是否大于0
+			 */
 			if (!isOpen()) {
 				setConnection(null);
 			}

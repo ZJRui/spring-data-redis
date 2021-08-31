@@ -24,6 +24,8 @@ import org.springframework.util.Assert;
 /**
  * Value (or String in Redis terminology) operations bound to a certain key.
  *
+ * 值(Redis术语中的String)操作绑定到某个键。
+ *
  * @author Costin Leau
  * @author Mark Paluch
  * @author Jiahe Cai

@@ -30,6 +30,8 @@ import org.springframework.util.Assert;
  * text and detect if script has been modified (and thus should have SHA1 re-calculated). This class is best used as a
  * Singleton to avoid re-calculation of SHA1 on every script execution.
  *
+ * RedisScript的默认实现。委托底层ScriptSource来检索脚本文本并检测脚本是否被修改(因此应该重新计算SHA1)。这个类最好作为Singleton使用，
+ * 以避免在每次脚本执行时重新计算SHA1。
  * @author Jennifer Hickey
  * @author Christoph Strobl
  * @param <T> The script result type. Should be one of Long, Boolean, List, or deserialized value type. Can be null if

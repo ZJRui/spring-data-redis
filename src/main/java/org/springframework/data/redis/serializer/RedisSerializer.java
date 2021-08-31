@@ -22,6 +22,8 @@ import org.springframework.util.ClassUtils;
  * Basic interface serialization and deserialization of Objects to byte arrays (binary data). It is recommended that
  * implementations are designed to handle null objects/empty arrays on serialization and deserialization side. Note that
  * Redis does not accept null keys or values but can return null replies (for non existing keys).
+ * 对象到字节数组(二进制数据)的基本接口序列化和反序列化。建议实现设计为在序列化和反序列化端处理空对象/空数组。
+ * 注意，Redis不接受null键或null值，但可以返回null回复(对于不存在的键)。
  *
  * @author Mark Pollack
  * @author Costin Leau
@@ -74,6 +76,7 @@ public interface RedisSerializer<T> {
 	 * Obtain a {@link RedisSerializer} that can read and write JSON using
 	 * <a href="https://github.com/FasterXML/jackson-core">Jackson</a>.
 	 *
+	 * Obtain a RedisSerializer that can read and write JSON using Jackson .
 	 * @return never {@literal null}.
 	 * @since 2.1
 	 */
