@@ -86,6 +86,18 @@ public interface RedisOperations<K, V> {
 	 * serializers to deserialize results
 	 * 在管道连接上执行给定的操作对象，返回结果。注意，回调不能返回一个非空值，因为它被管道覆盖了。此方法将使用默认的序列化器对结果进行反序列化
 	 *
+	 * --------------
+	 * 使用pipeline可以减少与redis通信次数，在一次通信中执行一系列命令
+	 *  Spring中通过RedisTemplate.executePipelined使用流水线执行命令
+	 *
+	 * 函数提供两种回调方式SessionCalback/RedisCallback
+	 * 与RedisTemplate.execute不同，executePipelined会自动将回调中每个命令的执行结果存入数组中返回，参数回调必须返回null，
+	 * 否则将抛出异常
+	 *  org.springframework.dao.InvalidDataAccessApiUsageException: Callback cannot return a non-null value as it
+	 *  gets overwritten by the pipeline
+	 *
+	 * pipeline不是原子操作
+	 *
 	 * @param action callback object to execute
 	 * @return list of objects returned by the pipeline
 	 */
