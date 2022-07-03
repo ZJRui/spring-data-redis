@@ -28,6 +28,26 @@ import org.springframework.lang.Nullable;
 public interface SessionCallback<T> {
 
 	/**
+	 *
+	 *应该来说 sessionCallback 中的所有操作 RedisOperation都会在同一个connection中执行
+	 *但是并不意味着一起执行，因为一个connection可以间隔 发送多条命令。 sessionCallback 回调方法中拿到的是RedisOperation对象
+	 * 我们用这个对象 执行多个操作，底层会使用同一个connection发送多条命令
+	 *
+	 *
+	 * 而RedisCallback 接口回调方法中传入的是connection对象，那就意味着你可以使用同一个connection操作执行多条命令
+	 *
+	 *
+	 *
+	 *
+	 *
+	 */
+
+
+
+
+
+
+	/**
 	 * Executes all the given operations inside the same session.
 	 * 在同一个会话中执行所有给定的操作。
 	 *

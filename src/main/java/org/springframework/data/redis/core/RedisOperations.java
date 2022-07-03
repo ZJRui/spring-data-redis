@@ -120,6 +120,20 @@ public interface RedisOperations<K, V> {
 	 *
 	 * 在管道连接上执行给定的Redis会话，使用专用的序列化器返回结果。允许事务被流水线处理。注意，回调不能返回一个非空值，因为它被管道覆盖了。
 	 *
+	 *
+	 * 使用pipeline可以减少与redis通信次数，在一次通信中执行一系列命令
+	 *  Spring中通过RedisTemplate.executePipelined使用流水线执行命令
+	 *
+	 * 函数提供两种回调方式SessionCalback/RedisCallback
+	 * 与RedisTemplate.execute不同，executePipelined会自动将回调中每个命令的执行结果存入数组中返回，参数回调必须返回null，否则将抛出异常
+	 *  org.springframework.dao.InvalidDataAccessApiUsageException: Callback cannot return a non-null value as it gets overwritten by the pipeline
+	 *
+	 * SessionCallback 接口中的返回值必须要是null，否则会报错
+	 *
+	 *
+	 * 注意： pipeline不是原子操作，也就是说 pipeline 中的多个命令可能只有前一部分成功执行，后面的没有执行
+	 *
+	 *
 	 * @param session Session callback
 	 * @param resultSerializer
 	 * @return list of objects returned by the pipeline
@@ -582,6 +596,27 @@ public interface RedisOperations<K, V> {
 	/**
 	 * Watch given {@code key} for modifications during transaction started with {@link #multi()}.
 	 *
+	 *
+	 * wath的用法参考org.springframework.data.redis.core.RedisTemplateIntegrationTests#testWatch()
+	 * 就是说 watch 需要在  事务开始multi方法之前执行， 如果在watch之后，事务开始之前有其他线程修改了指定的key，那么事务将不会执行
+	 * 因为 watch命令是单独执行的 ，multi方法开启事务 之后的命令是一起执行的，这是两个阶段。
+	 *
+	 * 有些场景是 watch之后 通过redis get来获取 被watch key的值，这个值会在multi方法中的事务中被使用。 那么问题就是如何保证 get 指定
+	 * watch的key得到的值 在事务执行的时候 再次 get 仍然是不变的，如果发生了变化那么就会影响事务的逻辑。 比如说
+	 *
+	 * step 1 wahtc key1
+	 * step2 get key1 =value1
+	 *
+	 * step 3 if(value1=="A"){
+	 *     step 4开启事务 multi
+	 *          step5  使用value1
+	 *     step 6 事务提价
+	 * }else{
+	 *     //不开启事务
+	 * }
+	 *
+	 *
+	 *
 	 * @param key must not be {@literal null}.
 	 * @see <a href="https://redis.io/commands/watch">Redis Documentation: WATCH</a>
 	 */
@@ -589,6 +624,9 @@ public interface RedisOperations<K, V> {
 
 	/**
 	 * Watch given {@code keys} for modifications during transaction started with {@link #multi()}.
+	 *在使用 multi() 开始的事务期间观察给定的键以进行修改。
+	 * Marks the given keys to be watched for conditional execution of a transaction.
+	 * 标记要监视的给定键以有条件地执行事务。
 	 *
 	 * @param keys must not be {@literal null}.
 	 * @see <a href="https://redis.io/commands/watch">Redis Documentation: WATCH</a>

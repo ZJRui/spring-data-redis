@@ -695,6 +695,38 @@ public class RedisTemplateIntegrationTests<K, V> {
 		assertThat(redisTemplate.type(key1)).isEqualTo(DataType.STRING);
 	}
 
+
+	/**
+	 *
+	 * redis事务multi应用
+	 *
+	 *java中的应用：
+	 * //一个新的Redis连接，如果请求的话支持事务
+	 * redisTemplate.setEnableTransactionSupport(true);
+	 * //需要监视的key
+	 * redisTemplate.watch(redisKey);
+	 * //开启事务
+	 * redisTemplate.multi();
+	 * // 需要放在事务中的逻辑代码
+	 * //do somthing
+	 *
+	 * //提交事务
+	 * redisTemplate.exec()
+	 * //刷新事务的所有以前监视的键。如果调用EXEC或DISCARD，则无需手动调用UNWATCH
+	 * redisTemplate.unwatch();
+	 * //关闭请求支持事务
+	 * redisTemplate.setEnableTransactionSupport(false);
+	 *
+	 * 注意事项：
+	 *
+	 * 查询操作应放在开启事务之前watch之后。因为multi就是一个汇总提交的操作，在事务过程中查询是不会被提交，也就得不到查询的数据，
+	 * 无法参与事物中其他需要该数据的逻辑。而watch之后该key对应的值才会被锁定，否则在watch之前的读取到的值还是会被修改的，
+	 * 会造成开启事物后的该值与之前获取的值不一致的问题。
+	 *
+	 *
+	 *
+	 *
+	 */
 	@ParameterizedRedisTest // DATAREDIS-506
 	public void testWatch() {
 		K key1 = keyFactory.instance();
@@ -705,20 +737,27 @@ public class RedisTemplateIntegrationTests<K, V> {
 
 		Thread th = new Thread(() -> redisTemplate.opsForValue().set(key1, value2));
 
+		/**
+		 * sessioncallabck 和redisCallback 有什么区别？
+		 * sessionCallback 是在同一个事务中
+		 */
 		List<Object> results = redisTemplate.execute(new SessionCallback<List<Object>>() {
 			@SuppressWarnings({ "unchecked", "rawtypes" })
 			public List<Object> execute(RedisOperations operations) throws DataAccessException {
 
 				operations.watch(key1);
-
+				//应该来说 sessionCallback 中的所有操作 RedisOperation都会在同一个connection中执行
+				//但是并不意味着一起执行，因为一个connection可以间隔 发送多条命令
 				th.start();
 				try {
 					th.join();
 				} catch (InterruptedException e) {}
-
 				operations.multi();
 				operations.opsForValue().set(key1, value3);
 				return operations.exec();
+				//问题：没有调用unwathc
+				////刷新事务的所有以前监视的键。如果调用EXEC或DISCARD，则无需手动调用UNWATCH
+				// redisTemplate.unwatch();
 			}
 		});
 
