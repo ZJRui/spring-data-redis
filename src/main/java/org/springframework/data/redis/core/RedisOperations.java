@@ -86,6 +86,18 @@ public interface RedisOperations<K, V> {
 	 * serializers to deserialize results
 	 * 在管道连接上执行给定的操作对象，返回结果。注意，回调不能返回一个非空值，因为它被管道覆盖了。此方法将使用默认的序列化器对结果进行反序列化
 	 *
+	 * --------------
+	 * 使用pipeline可以减少与redis通信次数，在一次通信中执行一系列命令
+	 *  Spring中通过RedisTemplate.executePipelined使用流水线执行命令
+	 *
+	 * 函数提供两种回调方式SessionCalback/RedisCallback
+	 * 与RedisTemplate.execute不同，executePipelined会自动将回调中每个命令的执行结果存入数组中返回，参数回调必须返回null，
+	 * 否则将抛出异常
+	 *  org.springframework.dao.InvalidDataAccessApiUsageException: Callback cannot return a non-null value as it
+	 *  gets overwritten by the pipeline
+	 *
+	 * pipeline不是原子操作
+	 *
 	 * @param action callback object to execute
 	 * @return list of objects returned by the pipeline
 	 */
@@ -172,6 +184,17 @@ public interface RedisOperations<K, V> {
 	 * Allocates and binds a new {@link RedisConnection} to the actual return type of the method. It is up to the caller
 	 * to free resources after use.
 	 *分配并绑定一个新的RedisConnection到方法的实际返回类型。调用方有权在使用后释放资源。
+	 *
+	 * ------------
+	 *
+	 * execute(RedisCallback<?> action) 和 executePipelined(final SessionCallback<?> session)：执行一系列 Redis 命令，
+	 * 是所有方法的基础，里面使用的连接资源会在执行后自动释放。
+	 *
+	 * executePipelined(RedisCallback<?> action) 和 executePipelined(final SessionCallback<?> session)：使用 PipeLine
+	 * 执行一系列命令，连接资源会在执行后自动释放。
+	 *
+	 * executeWithStickyConnection(RedisCallback<T> callback)：执行一系列 Redis 命令，连接资源不会自动释放，各种 Scan
+	 * 命令就是通过这个方法实现的，因为 Scan 命令会返回一个 Cursor，这个 Cursor 需要保持连接（会话），同时交给用户决定什么时候关闭。
 	 *
 	 * @param callback must not be {@literal null}.
 	 * @return
@@ -627,6 +650,35 @@ public interface RedisOperations<K, V> {
 	 *在使用 multi() 开始的事务期间观察给定的键以进行修改。
 	 * Marks the given keys to be watched for conditional execution of a transaction.
 	 * 标记要监视的给定键以有条件地执行事务。
+	 *
+	 *
+	 *
+	 *   List list = (List) redisTemplate.execute((RedisOperations res) ->
+	 *         {
+	 *             //设置监控key,在exec执行前如果这个key对应的值，发生了变化，事务不执行
+	 *             //通常监控的key可以是ID，也可以是一个对象
+	 *             res.watch("wanwan");
+	 *             // 其实watch可以注释掉，或者设置成不监控
+	 *             res.unwatch();
+	 *             //开启事务，在exec执行前
+	 *             res.multi();
+	 *             res.opsForValue().increment("wanwan", 1);
+	 *             res.opsForValue().set("wanwan2", "我的小兔兔1");
+	 *             Object value2 = res.opsForValue().get("wanwan2");
+	 *             System.out.println("命令在队列，所以取值为空" + value2 + "----");
+	 *             res.opsForValue().set("wanwan3", "我的小兔兔3");
+	 *             Object value3 = res.opsForValue().get("wanwan3");
+	 *             System.out.println("命令在队列，所以取值为空" + value3 + "----");
+	 *             return res.exec();
+	 *         });
+	 *
+	 *     发现其实事务就是基于SessionCallback实现了一个watch如果被监控的键发生了变化就会取消事务，
+	 *     没有变化九执行事务（注意：即使被赋予了相同的值，同样视为发生变化，不予执行事务）
+	 *     redis通过watch来监测数据，在执行exec前，监测的数据被其他人更改会抛出错误，取消执行。而exec执行时，
+	 *     redis保证不会插入其他人语句来实现隔离。（可以预见到此机制如果事务中包裹过多的执行长指令，可能导致长时间阻塞其他人）
+	 *
+	 *
+	 *
 	 *
 	 * @param keys must not be {@literal null}.
 	 * @see <a href="https://redis.io/commands/watch">Redis Documentation: WATCH</a>

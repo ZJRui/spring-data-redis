@@ -27,6 +27,17 @@ import org.springframework.lang.Nullable;
  * @author Costin Leau
  */
 public interface RedisCallback<T> {
+	/**
+	 *
+	 * redisTemplate执行两条命令其实是在两个连接里完成的，
+	 * 因为redisTemplate执行完一个命令就会对其关闭，但是redisTemplate额外为什么提供了RedisCallback和SessionCallBack两个接口
+	 *
+	 * 
+	 * RedisCallback和SessionCallBack：
+	 *
+	 * 作用: 让RedisTemplate进行回调，通过他们可以在同一条连接中执行多个redis命令
+	 * SessionCalback提供了良好的封装，优先使用它，redisCallback太复杂还是不要使用为好
+	 */
 
 	/**
 	 * Gets called by {@link RedisTemplate} with an active Redis connection. Does not need to care about activating or
