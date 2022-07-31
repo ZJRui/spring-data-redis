@@ -34,8 +34,12 @@ import org.springframework.util.Assert;
  * @author dengliming
  * @since 2.0
  */
+@SuppressWarnings("all")
 class JedisListCommands implements RedisListCommands {
 
+	/**
+	 * command 中持有 jedisConnection
+	 */
 	private final JedisConnection connection;
 
 	JedisListCommands(JedisConnection connection) {
@@ -45,6 +49,10 @@ class JedisListCommands implements RedisListCommands {
 	/*
 	 * (non-Javadoc)
 	 * @see org.springframework.data.redis.connection.RedisListCommands#rPush(byte[], byte[][])
+	 *
+	 *
+	 *
+	 *   redis 中就是： RPUSH KEY_NAME VALUE1..VALUEN
 	 */
 	@Override
 	public Long rPush(byte[] key, byte[]... values) {
@@ -57,6 +65,9 @@ class JedisListCommands implements RedisListCommands {
 	/*
 	 * (non-Javadoc)
 	 * @see org.springframework.data.redis.connection.RedisListCommands#l{lPos(byte[], byte[], java.lang.Integer, java.lang.Integer)
+	 *
+	 *
+	 * redis中就是：LPOS mylist c RANK 2  6   表示 返回 key为mylist的 redis数据结构中 第2个元素开始，总共6个元素
 	 */
 	@Override
 	public List<Long> lPos(byte[] key, byte[] element, @Nullable Integer rank, @Nullable Integer count) {
@@ -168,12 +179,30 @@ class JedisListCommands implements RedisListCommands {
 	/*
 	 * (non-Javadoc)
 	 * @see org.springframework.data.redis.connection.RedisListCommands#lInsert(byte[], org.springframework.data.redis.connection.RedisListCommands.Position, byte[], byte[])
+	 *
+	 *
+	 * redis 命令： LINSERT key BEFORE|AFTER pivot value
+	 *
 	 */
 	@Override
 	public Long lInsert(byte[] key, Position where, byte[] pivot, byte[] value) {
 
 		Assert.notNull(key, "Key must not be null!");
 
+		/**
+		 * JedisInvoke 承载执行逻辑，
+		 * 我们对命令的抽象就是 输入一个或者多个参数 返回一个值。 因此 JedisInvoke 中定义了 函数式接口。
+		 * 每个命令 的方法作为函数是接口的实现。
+		 *
+		 * BinaryJedis::linsert表示对函数式接口 ConnectionFunction4<T1, T2, T3, T4, R> function 的实现。
+		 *
+		 * 他对应着 list的insert。 需要的参数在方法后面定义。
+		 *
+		 * 因为JedisInvoke 通过方法参数来承载 各个命令的执行逻辑， 谁来执行 这个命令呢 就是JedisInvoker 中的
+		 * Synchronizer属性。
+		 *
+		 *
+		 */
 		return connection.invoke().just(BinaryJedis::linsert, MultiKeyPipelineBase::linsert, key,
 				JedisConverters.toListPosition(where), pivot, value);
 	}

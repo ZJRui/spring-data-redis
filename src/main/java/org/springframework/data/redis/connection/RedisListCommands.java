@@ -22,6 +22,7 @@ import org.springframework.util.CollectionUtils;
 
 /**
  * List-specific commands supported by Redis.
+ * //Redis支持的具体命令列表。
  *
  * @author Costin Leau
  * @author Christoph Strobl

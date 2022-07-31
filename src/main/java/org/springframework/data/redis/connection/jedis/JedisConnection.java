@@ -158,7 +158,6 @@ public class JedisConnection extends AbstractRedisConnection {
 			Supplier<Object> nullDefault) {
 
 		return doWithJedis(it -> {
-
 			if (isPipelined()) {
 
 				Response<Object> response = pipelineFunction.apply(getRequiredPipeline());

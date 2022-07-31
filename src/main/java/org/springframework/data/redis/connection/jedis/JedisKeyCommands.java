@@ -45,6 +45,7 @@ import org.springframework.util.Assert;
  * @author ihaohong
  * @since 2.0
  */
+@SuppressWarnings("all")
 class JedisKeyCommands implements RedisKeyCommands {
 
 	private final JedisConnection connection;
@@ -324,7 +325,31 @@ class JedisKeyCommands implements RedisKeyCommands {
 	public Long ttl(byte[] key) {
 
 		Assert.notNull(key, "Key must not be null!");
-
+		/**
+		 * 这行代码是什么意思呢
+		 * Connection是JedisConnection ,  连接 可以对外报一个执行execute方法，execute方法接受一个命令和参数。
+		 * 但是 这里的设计 connection 仅有一个invoke方法，且没有参数， 这就说明connnection需要执行的逻辑放置在了
+		 * connection内部的状态属性。  实际是 connection的 JedisInvoker invoker属性。
+		 *
+		 * 因此我们拿到了一个 JedisInvoker ，然后告诉他执行什么命令，以及命令的参数。
+		 *
+		 * 第一个参数 BinaryJedis::ttl 是ConnectionFunction1 ， 不同redis民工的 ConnectionFunction1设计不同。
+		 *
+		 * 第二个参数是 MultiKeyPipelineBase::ttl ，不同redis命令的 PipelineFunction4 也是不同。
+		 *
+		 * 第三个参数就是redis命令的参数。
+		 *
+		 *
+		 * 另外一方面： JedisConnection 中持有Jedis属性，JedisConnection的doInvoke方法中，会执行
+		 * Object result = directFunction.apply(getJedis()); 这表明 JedisConnection 需要提供 底层连接
+		 *
+		 *
+		 * 因此最终就是：JedisConnection 将内部 命令执行逻辑委托给JedisInvoker, 对逻辑的执行提供connection。
+		 *
+		 * 我们接下来关心的是 JedisInvoker 对执行逻辑的封装。
+		 *
+		 *
+		 */
 		return connection.invoke().just(BinaryJedis::ttl, MultiKeyPipelineBase::ttl, key);
 	}
 

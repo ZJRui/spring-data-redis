@@ -5,9 +5,13 @@
 
 	<groupId>org.springframework.data</groupId>
 	<artifactId>spring-data-redis</artifactId>
-	<version>2.6.0</version>
+    <packaging>pom</packaging>
+    <version>2.6.0</version>
+    <modules>
+        <module>sachin-data-redis-learn-pattern</module>
+    </modules>
 
-	<name>Spring Data Redis</name>
+    <name>Spring Data Redis</name>
 
 	<parent>
 		<groupId>org.springframework.data.build</groupId>

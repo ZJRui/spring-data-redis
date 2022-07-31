@@ -58,8 +58,44 @@ import org.springframework.util.Assert;
  * @author Christoph Strobl
  * @since 2.5
  */
+@SuppressWarnings("all")
 class JedisInvoker {
+	/**
+	 * Jedis方法的函数调用实用程序。通常用于将方法调用表示为方法引用，
+	 * 并通过一个just或from方法传递方法参数。
+	 * 只有方法记录方法调用并立即计算方法结果。from方法允许组合一个函数管道来使用Converter转换结果。
+	 * 使用的例子:
+	 *
+	 *
+	 */
 
+
+
+	/**
+	 * 每一个JedisInvoker 对象都有一个 Synchronizer
+	 *
+	 * JedisInvoker  作为JedisConnection的属性 被创建， 在创建JedisInvoker的时候
+	 * 提供了 一个Synchronizer的实现类对象。
+	 *
+	 * Synchronizer对象的doInvoker  会去执行 jedisConnection的doInvoke 方法,  并且Synchronizer对象的doInvoker方法会透传到JedisConnection的doInvoke
+	 *
+	 * JedisConnection的 JedisInvoker 属性，下面的doInvoke方法 本质就是调用当前对象（JedisConnection）的doInvoke
+	 * 	private final JedisInvoker invoker = new JedisInvoker((directFunction, pipelineFunction, converter,
+	 *   nullDefault) -> doInvoke(false, directFunction, pipelineFunction, converter, nullDefault));
+	 *
+	 *
+	 * 那么问题就是JedisConnection 通过 JedisInvoker  会最终执行 Synchronizer的 doInvoke，而Synchronizer的doInvoke
+	 * 最终又会执行 JedisConnection的doInvoke。
+	 *
+	 * 那么这个方法的参数是怎么来的呢？方法是如何被触发的呢？
+	 *
+	 * 答案就是 JedisConnection 通过 其invoke方法 返回 JedisInvoker, JedisInvoker 对象内部 存在各种 just方法。
+	 *
+	 *
+	 * just方法的作用就是 接收一个函数，将这个函数进行包装 之后交给 synchronizer执行
+	 *
+	 *
+	 */
 	private final Synchronizer synchronizer;
 
 	JedisInvoker(Synchronizer synchronizer) {
@@ -93,6 +129,21 @@ class JedisInvoker {
 		Assert.notNull(function, "ConnectionFunction must not be null!");
 		Assert.notNull(pipelineFunction, "PipelineFunction must not be null!");
 
+		/**
+		 * 这个地方注意
+		 * function 是一个函数ConnectionFunction0<R>,执行这个函数的apply 就可以得到一个R。
+		 *
+		 * 但是下面的 function::apply 不是执行 ConnectionFunction0的 apply函数的意思。
+		 * 而是再次进行了封装 。
+		 *
+		 * 而且值得注意的是  ConnectionFunction0 中定义的apply函数 是一个输入Jedis ，返回R的函数。
+		 * R apply(Jedis connection);
+		 *
+		 * synchronizer的ivoke方法的第一个参数  也是一个输入Jedis的函数。 但是我们并不是讲 function直接传递，
+		 * 而是传递了 function::apply  。
+		 * 原因是 function是一个 ConnectionFunction0 对象， 而invoke接受的是一个Function 对象。
+		 *
+		 */
 		return synchronizer.invoke(function::apply, pipelineFunction::apply, Converters.identityConverter(), () -> null);
 	}
 
@@ -151,6 +202,18 @@ class JedisInvoker {
 
 	/**
 	 * Invoke the {@link ConnectionFunction4} and return its result.
+	 * 调用 ConnectionFunction4。并返回其结果。
+	 *
+	 *这个 just 是 针对接收4个参数 ，返回一个值的 redis 命令， 比如
+	 * lpos: > LPOS mylist c RANK -1 COUNT 2   返回[7,6]，含义：其中rank和count是lpos的固定语法，参数是mylist，c ，-1，2 这四个.
+	 * We can combine COUNT and RANK, so that COUNT will try to return up to the specified number of matches, but starting from the Nth match, as specified by the RANK option.
+	 *
+	 *
+	 * linsert: LINSERT key BEFORE|AFTER pivot value 列如：linsert mylist before "world" "There"
+	 *
+	 *
+	 * lMove:
+	 *
 	 *
 	 * @param function must not be {@literal null}.
 	 * @param pipelineFunction must not be {@literal null}.
@@ -166,6 +229,55 @@ class JedisInvoker {
 		Assert.notNull(function, "ConnectionFunction must not be null!");
 		Assert.notNull(pipelineFunction, "PipelineFunction must not be null!");
 
+		/**
+		 *1.
+		 * just函数的作用 是什么？ 比如当前的这个just 会在 JedisListCommand的
+		 * public Long lInsert(byte[] key, Position where, byte[] pivot, byte[] value) 方法中 通过
+		 *  connection.invoke().just(BinaryJedis::linsert, MultiKeyPipelineBase::linsert, key,
+		 * 				JedisConverters.toListPosition(where), pivot, value);
+		 *
+		 * 方式被调用到，  这里我们可以看到  just方法的function参数实际上 对应着 BinaryJedis::linsert， BinaryJedis 是底层Jedis包的实现。
+		 * 他就对应着 一条redis命令：
+		 *  linsert(final byte[] key, final ListPosition where, final byte[] pivot,
+		 *       final byte[] value)
+		 *
+		 *
+		 *  linsert 命令有四个参数， 因此我们设计一个 输入4个参数返回一个Value的 函数接口ConnectionFunction4<T1, T2, T3, T4, R>
+		 *
+		 *  这个函数接口的4个参数 在just方法中 通过入参标记， 因此我们需要将  T1  t2 t3 t4 交给ConnectionFunction4。
+		 *
+		 *  交付的方式 就是  function.apply(it, t1, t2, t3, t4), 那么问题是 function的apply为什么会有5个参数 呢,it是什么呢？ 这是因为
+		 *
+		 *  函数是接口ConnectionFunction4  在设计的时候就约定了 他的第一个参数是Jedis， 另外有4个不固定的参数
+		 *  R apply(Jedis connection, T1 t1, T2 t2, T3 t3, T4 t4);
+		 *
+		 *
+		 *  下面的代码中   it -> function.apply(it, t1, t2, t3, t4)  是定义了一个 输入it返回一个值的函数，  这个函数的内部实现是去执行 just的入参function
+		 *  也就是相当于对函数再做一次封装， 为什么要封装呢？因为 synchronizer的invoke方法第一个参数就是接收 T输出R的 函数。
+		 *
+		 *
+		 *  那么问题是 just方法中提供了 t1 t2 t3 t4 参数，因此 t1 -t4 是确定的。 但是
+		 *
+		 *  it -> function.apply(it, t1, t2, t3, t4) 定义的函数 it对象是哪个对象是不确定的，这里只是定义了一个 输入it 返回某一个值的函数，
+		 *  it对象实际是哪个对象需要等到 这个函数真正执行的时候才确定。 那么 it -> function.apply(it, t1, t2, t3, t4) 这个函数什么时候执行呢？
+		 *  显然 是在 synchronizer的invoke方法 中， 但是实际 synchronizer的invoke方法又将函数it -> function.apply(it, t1, t2, t3, t4)
+		 *  透传到 JedisConnection的doinvoke方法中，也就是JedisConnection的doInvoke方法中的directFunction  参数，
+		 *  directFunction函数的执行是
+		 *  Object result = directFunction.apply(getJedis());
+		 *  getJedis()会获取JedisConnection中的jedis属性。
+		 *
+		 *
+		 * 2. invoke 的第一个参数 是一个 Function<Jedis, I>， 也就是这个函数到时候执行的时候 我会给他一个Jedis作为入参，他返回给我一个I
+		 *
+		 * 注意 it->function.apply(it,t1-t4)  入参it 也就是jedis 被 应用到 function 的apply函数中， function是ConnectionFunction4，也就是说
+		 * ConnectionFunction4的 apply 接收的第一个参数就是Jedis
+		 *
+		 * it->function.apply(it,t1,t2,t3,t4)被封装成 synchronizer的invoke方法的 Function<Jedis, I> callFunction参数，
+		 * 这个callFunction 被透传到JedisConnection的doInvoke方法中directFunction， it->function.apply被看做是一个 需要提供Jedis的函数
+		 * 在JedisConnection的doInvoke 中，directFunction的执行 就会提供Jedis
+		 *  Object result = directFunction.apply(getJedis());
+		 *
+		 */
 		return synchronizer.invoke(it -> function.apply(it, t1, t2, t3, t4),
 				it -> pipelineFunction.apply(it, t1, t2, t3, t4));
 	}
@@ -852,6 +964,8 @@ class JedisInvoker {
 		/**
 		 * Apply this function to the arguments and return a {@link Response}.
 		 *
+		 * 将此函数应用于参数并返回一个Response。
+		 *
 		 * @param connection the connection in use. Never {@literal null}.
 		 * @param t1 first argument.
 		 * @param t2 second argument.
@@ -1007,9 +1121,10 @@ class JedisInvoker {
 
 	/**
 	 * Interface to define a synchronization function to evaluate the actual call.
+	 * 接口来定义一个同步函数来计算实际调用。
 	 */
 	@FunctionalInterface
-	interface Synchronizer {
+	interface Synchronizer {//同步器
 
 		@Nullable
 		@SuppressWarnings({ "unchecked", "rawtypes" })

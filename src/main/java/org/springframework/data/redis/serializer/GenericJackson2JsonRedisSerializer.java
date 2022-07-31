@@ -43,6 +43,13 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
  */
 public class GenericJackson2JsonRedisSerializer implements RedisSerializer<Object> {
 
+	/**
+	 * 基于Jackson 2的通用RedisSerializer，它使用动态类型将对象映射到JSON。
+	 *
+	 * 序列化之后带有class属性
+	 * {"@class":"com.yupaopao.hug.chatroom.zjr.redis.SerializerTest$Student","name":"a"}
+	 */
+
 	private final ObjectMapper mapper;
 
 	/**

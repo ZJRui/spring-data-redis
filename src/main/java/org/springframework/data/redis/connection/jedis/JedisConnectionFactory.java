@@ -519,6 +519,11 @@ public class JedisConnectionFactory implements InitializingBean, DisposableBean,
 			sentinelConfig = createSentinelClientConfig(sentinelConfiguration);
 		}
 
+		/**
+		 *   将Jedis包装成 JedisConnection.
+		 *   jedis 是redis.clients.jedis.Jedis  其内部 有  protected final Client client; 属性
+		 *   JedisConnection 内部就是通过 反射拿到这个client属性
+		 */
 		JedisConnection connection = (getUsePool() ? new JedisConnection(jedis, pool, this.clientConfig, sentinelConfig)
 				: new JedisConnection(jedis, null, this.clientConfig, sentinelConfig));
 		connection.setConvertPipelineAndTxResults(convertPipelineAndTxResults);

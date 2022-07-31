@@ -44,6 +44,7 @@ import org.springframework.util.Assert;
  * @author Andrey Shlykov
  * @since 2.0
  */
+@SuppressWarnings("all")
 class JedisZSetCommands implements RedisZSetCommands {
 
 	private final JedisConnection connection;

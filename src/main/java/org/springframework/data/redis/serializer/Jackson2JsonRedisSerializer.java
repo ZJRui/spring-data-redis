@@ -37,7 +37,67 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
  * @author Thomas Darimont
  * @since 1.2
  */
+@SuppressWarnings("all")
 public class Jackson2JsonRedisSerializer<T> implements RedisSerializer<T> {
+	/**
+	 * 可以使用Jackson’s和Jackson Databind objectapper读写JSON的RedisSerializer。
+	 * 此转换器可用于绑定到类型化bean或非类型化HashMap实例。注意:Null对象被序列化为空数组，反之亦然。
+	 *
+	 *
+	 * JacksonJsonRedisSerializer和GenericJackson2JsonRedisSerializer，两者都能系列化成json，但是后者会在json中加入@class属性，
+	 * 类的全路径包名，方便反系列化。前者如果存放了List则在反系列化的时候如果没指定TypeReference则会报错java.util.LinkedHashMap
+	 * cannot be cast to 。
+	 *
+	 * 序列化的要求是 需要实现 Serializable，但是 如果 Student没有实现 Seriializer 接口，也可以使用Jackson2JsonRedisSerializer 进行序列化。
+	 * 因为 Jackson2JsonRedisSerializer 这类序列化的实现 是先讲 对象转为 String，然后进行 write。
+	 * 问题的关键如何转成String。
+	 *
+	 *------------------------------
+	 * RedisTemplate中序列化方式GenericJackson2JsonRedisSerializer和Jackson2JsonRedisSerializer的区别
+	 * Jackson2JsonRedisSerializer和GenericJackson2JsonRedisSerializer都是序列化为json格式。
+	 * 不同：
+	 *
+	 *   如果存储的类型为List等带有泛型的对象，反序列化的时候 Jackson2JsonRedisSerializer序列化方式会报错，而GenericJackson2JsonRedisSerializer序列化方式是成功的，
+	 *
+	 * 原因：
+	 *
+	 *    Jackson2JsonRedisSerializer序列化方式数据：
+	 *
+	 * [
+	 *     {
+	 *         "userId": null,
+	 *         "userName": "你好",
+	 *         "password": "22222222222",
+	 *         "phone": null
+	 *     }
+	 * ]
+	 *    GenericJackson2JsonRedisSerializer序列化方式数据：
+	 *
+	 * [
+	 *     "java.util.ArrayList",
+	 *     [
+	 *         {
+	 *             "@class": "com.winterchen.model.User",
+	 *             "userId": null,
+	 *             "userName": "你好",
+	 *             "password": "22222222222",
+	 *             "phone": null
+	 *         }
+	 *     ]
+	 * ]
+	 * 当反序列化的时候 Jackson2JsonRedisSerializer方式的list中放的是LinkedHashMap，而我们是强转为User类型的所以报错
+	 *
+	 * GenericJackson2JsonRedisSerializer方式中有@class字段保存有类型的包路径，可以顺利的转换为
+	 * 我们需要的User类型，比如：{"@class":"com.yupaopao.hug.chatroom.zjr.redis.SerializerTest$Student","name":"a"}
+	 * ————————————————
+	 * 版权声明：本文为CSDN博主「after_you」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+	 * 原文链接：https://blog.csdn.net/after_you/article/details/81086904
+	 *
+	 * ------------
+	 *
+	 *
+	 *
+	 */
 
 	public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
@@ -83,6 +143,7 @@ public class Jackson2JsonRedisSerializer<T> implements RedisSerializer<T> {
 			return SerializationUtils.EMPTY_ARRAY;
 		}
 		try {
+
 			return this.objectMapper.writeValueAsBytes(t);
 		} catch (Exception ex) {
 			throw new SerializationException("Could not write JSON: " + ex.getMessage(), ex);
