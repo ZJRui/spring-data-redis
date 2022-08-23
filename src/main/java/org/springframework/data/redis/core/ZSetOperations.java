@@ -40,6 +40,7 @@ import org.springframework.util.Assert;
  * @author Wongoo (望哥)
  * @author Andrey Shlykov
  */
+@SuppressWarnings("all")
 public interface ZSetOperations<K, V> {
 
 	/**
@@ -234,6 +235,30 @@ public interface ZSetOperations<K, V> {
 
 	/**
 	 * Get elements between {@code start} and {@code end} from sorted set.
+	 *
+	 *
+	 * --------
+	 *
+	 *
+	 *  ZRANGE myzset 0 1 will return both the first and the second element of the sorted set.
+	 *
+	 * The indexes can also be negative numbers indicating offsets from the end of the sorted set, with -1 being the
+	 * last element of the sorted set, -2 the penultimate element, and so on.
+	 *
+	 *[2] > zrange myset 0 0
+	 * 1) "one"
+	 *
+	 * [2] > zrange myset 0 1
+	 * 1) "one"
+	 * 2) "two"
+	 *
+	 * [2] > zrange myset 0 2
+	 * 1) "one"
+	 * 2) "two"
+	 * 3) "three"
+	 *
+	 *
+	 * -------------------
 	 *
 	 * @param key must not be {@literal null}.
 	 * @param start
